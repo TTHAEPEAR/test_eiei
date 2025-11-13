@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Socket Chat App — SP2</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>Socket Chat</h1>
+      <div class="header-actions">
+        <button id="themeBtn" title="Change theme">🎨 Theme</button>
+        <div id="meBox"></div>
+      </div>
+    </header>
+
+    <main>
+      <aside>
+        <section>
+          <h2>Users</h2>
+          <ul id="userList"></ul>
+        </section>
+        <section>
+          <h2>Groups</h2>
+          <div class="group-actions">
+            <input id="newGroupName" placeholder="New group name" />
+            <button id="createGroupBtn" type="button">Create</button>
+          </div>
+          <div id="groupError" class="error"></div>
+          <ul id="groupList"></ul>
+        </section>
+      </aside>
+
+      <section id="chat">
+        <div id="roomHeader">
+          <span id="roomTitle">No room selected</span>
+          <button id="e2eeBtn" title="Enable end‑to‑end encryption">🔒 E2EE</button>
+        </div>
+        <div id="messages"></div>
+        <form id="sendForm">
+          <input id="msgInput" placeholder="Type a message…" autocomplete="off" />
+          <button type="submit">Send</button>
+          <input type="file" id="fileInput" />
+        </form>
+      </section>
+    </main>
+
+    <!-- Theme Selector Modal -->
+    <div id="themeModal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Choose Theme</h3>
+          <button id="closeModal" class="close-btn">&times;</button>
+        </div>
+        <div class="theme-grid">
+          <button class="theme-option" data-theme="midnight">
+            <div class="theme-preview midnight-preview"></div>
+            <span>Midnight Blue</span>
+          </button>
+          <button class="theme-option" data-theme="sunset">
+            <div class="theme-preview sunset-preview"></div>
+            <span>Sunset Orange</span>
+          </button>
+          <button class="theme-option" data-theme="forest">
+            <div class="theme-preview forest-preview"></div>
+            <span>Forest Green</span>
+          </button>
+          <button class="theme-option" data-theme="purple">
+            <div class="theme-preview purple-preview"></div>
+            <span>Royal Purple</span>
+          </button>
+          <button class="theme-option" data-theme="ocean">
+            <div class="theme-preview ocean-preview"></div>
+            <span>Deep Ocean</span>
+          </button>
+          <button class="theme-option" data-theme="rose">
+            <div class="theme-preview rose-preview"></div>
+            <span>Rose Gold</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/client.js"></script>
+  <script src="/theme.js"></script>
+</body>
+</html>
