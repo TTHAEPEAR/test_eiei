@@ -1,4 +1,4 @@
-// public/client.js (SP2: improved group create flow)
+// public/client.js (SP2: blink-fixed, incremental updates, debounced read receipts)
 const socket = io();
 
 let myName = null;
@@ -22,7 +22,7 @@ const el = {
   e2eeBtn: document.getElementById('e2eeBtn')
 };
 
-// ---- E2EE helpers (same as prior build) ----
+// ---------- E2EE helpers ----------
 let e2ee = { enabled:false, key:null, salt:null };
 async function deriveKey(passphrase, salt) {
   const enc = new TextEncoder();
@@ -54,10 +54,10 @@ async function enableE2EEForRoom() {
   e2ee.key = await deriveKey(pass, salt);
   e2ee.enabled = true; e2ee.salt = salt;
   el.e2eeBtn.textContent = '🔒 E2EE On';
-  renderRoomHeader();
+  updateHeader(); // minimal update
 }
 
-// ---- Typing indicator ----
+// ---------- Typing indicator (no header thrash) ----------
 let typingTimer; let currentlyTyping = false;
 function emitTyping(isTyping){ if (activeRoom) socket.emit('typing', { roomId: activeRoom.id, isTyping }); }
 el.msgInput.addEventListener('input', ()=>{
@@ -65,21 +65,34 @@ el.msgInput.addEventListener('input', ()=>{
   clearTimeout(typingTimer);
   typingTimer = setTimeout(()=>{ currentlyTyping=false; emitTyping(false); }, 1200);
 });
+
 socket.on('typing', ({from,roomId,isTyping})=>{
   if (!activeRoom || activeRoom.id !== roomId) return;
   if (isTyping) typers.add(from); else typers.delete(from);
-  renderRoomHeader();
+  updateHeader(); // only updates text if changed
 });
-function renderRoomHeader(){
-  if (!activeRoom){ el.roomTitle.textContent = 'No room selected'; return; }
+
+function roomBaseTitle(){
+  if (!activeRoom) return 'No room selected';
+  return `${activeRoom.kind==='dm'?'DM with':'Group'}: ${activeRoom.title}`;
+}
+let lastHeaderText = '';
+function updateHeader(){
+  if (!activeRoom){ setHeaderText('No room selected'); return; }
   const suffix = typers.size ? ` • ${[...typers].join(', ')} is typing…` : '';
-  el.roomTitle.textContent = `${activeRoom.kind==='dm'?'DM with':'Group'}: ${activeRoom.title}${suffix}`;
+  setHeaderText(roomBaseTitle() + suffix);
+}
+function setHeaderText(s){
+  if (lastHeaderText !== s) {
+    el.roomTitle.textContent = s;
+    lastHeaderText = s;
+  }
 }
 
-// ---- Receipts (DM) ----
+// ---------- Receipts (DM) ----------
 function newMsgId(){ return `${myName}-${Date.now()}-${Math.random().toString(36).slice(2,8)}`; }
 
-// ---- Register ----
+// ---------- Register ----------
 async function promptName(){
   let name='';
   do{
@@ -95,12 +108,13 @@ async function promptName(){
 function ensureRegistered(){ return !!myName; }
 function emitAck(event, payload){ return new Promise(resolve=>socket.emit(event, payload, resolve)); }
 
+// ---------- Room & render helpers ----------
 function setRoom(roomId, kind, title, history=[]){
   activeRoom = { id:roomId, kind, title };
   messagesByRoom.set(roomId, history);
   typers.clear();
-  renderRoomHeader();
-  renderMessages();
+  updateHeader();
+  renderMessages(); // initial (full) render only when switching rooms
 }
 
 function renderTextMaybeLink(t){
@@ -111,20 +125,40 @@ function renderTextMaybeLink(t){
   return m[1]==='image' ? `<img src="${url}" style="max-width:240px;border-radius:8px;">`
                         : `<a href="${url}" target="_blank" rel="noopener">Download file</a>`;
 }
-function renderMessages(){
-  const arr = messagesByRoom.get(activeRoom?.id) || [];
-  el.messages.innerHTML = arr.map(m=>{
-    const tick = (m.from===myName) ? (m.seen?'✓✓':(m.delivered?'✓':'')) : '';
-    return `<div class="msg ${m.from===myName?'me':''}">
-      <span class="meta">${new Date(m.ts).toLocaleTimeString()} • ${m.from} ${tick}</span>
-      <div class="text">${renderTextMaybeLink(m.text)}</div>
-    </div>`;
-  }).join('');
-  el.messages.scrollTop = el.messages.scrollHeight;
-}
 function escapeHtml(s){ return s.replace(/[&<>"]+/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
-// Users list
+function msgKey(m){ return m.id || `${m.from}-${m.ts}`; }
+
+function makeMsgNode(m){
+  const wrap = document.createElement('div');
+  wrap.className = 'msg' + (m.from === myName ? ' me' : '');
+  wrap.dataset.id = msgKey(m);
+  const tick = (m.from===myName) ? (m.seen ? '✓✓' : (m.delivered ? '✓' : '')) : '';
+  wrap.innerHTML = `
+    <span class="meta">${new Date(m.ts).toLocaleTimeString()} • ${m.from} <span class="ticks">${tick}</span></span>
+    <div class="text">${renderTextMaybeLink(m.text || '')}</div>
+  `;
+  return wrap;
+}
+
+function appendMessageNode(node){
+  const nearBottom = el.messages.scrollHeight - el.messages.scrollTop - el.messages.clientHeight < 40;
+  el.messages.appendChild(node);
+  if (nearBottom) el.messages.scrollTop = el.messages.scrollHeight;
+}
+
+function renderMessages(){
+  const arr = messagesByRoom.get(activeRoom?.id) || [];
+  el.messages.innerHTML = '';
+  for (const m of arr) appendMessageNode(makeMsgNode(m));
+}
+
+function setTickById(id, tickText){
+  const node = el.messages.querySelector(`.msg[data-id="${id}"] .ticks`);
+  if (node) node.textContent = tickText;
+}
+
+// ---------- Users list ----------
 socket.on('user_list', (users)=>{
   el.userList.innerHTML='';
   (users||[]).filter(u=>u!==myName).forEach(u=>{
@@ -141,7 +175,7 @@ socket.on('user_list', (users)=>{
   });
 });
 
-// Groups list
+// ---------- Groups list ----------
 socket.on('groups_list', (groups)=>renderGroupList(groups));
 function renderGroupList(groups){
   el.groupList.innerHTML='';
@@ -173,7 +207,7 @@ function renderGroupList(groups){
   });
 }
 
-// Create group (robust)
+// ---------- Create group (robust) ----------
 el.createGroupBtn.addEventListener('click', async ()=>{
   el.groupError.textContent='';
   if (!ensureRegistered()){ await promptName(); if (!ensureRegistered()) { el.groupError.textContent='Please register first.'; return; } }
@@ -187,7 +221,7 @@ el.createGroupBtn.addEventListener('click', async ()=>{
   el.newGroupName.value='';
 });
 
-// Send message
+// ---------- Send message ----------
 el.sendForm.addEventListener('submit', async (e)=>{
   e.preventDefault();
   const text = el.msgInput.value.trim();
@@ -207,13 +241,20 @@ el.sendForm.addEventListener('submit', async (e)=>{
   el.msgInput.value='';
 });
 
-// File upload
+// ---------- File upload ----------
 el.fileInput.addEventListener('change', async (e)=>{
   if (!activeRoom || !e.target.files.length) return;
   const fd=new FormData(); fd.append('file', e.target.files[0]);
-  const resp=await fetch('/upload', { method:'POST', body: fd }); const data=await resp.json();
-  if (!data.ok) return alert(data.error||'Upload failed');
-  const url=data.url; const text = data.mimetype.startsWith('image/') ? `(image) ${url}` : `(file) ${url}`;
+  let data;
+  try {
+    const resp=await fetch('/upload', { method:'POST', body: fd });
+    data = await resp.json();
+  } catch {
+    alert('Upload failed (network or non-JSON error)'); e.target.value=''; return;
+  }
+  if (!data.ok) { alert(data.error||'Upload failed'); e.target.value=''; return; }
+
+  const url=data.url; const text = data.mimetype?.startsWith('image/') ? `(image) ${url}` : `(file) ${url}`;
   if (activeRoom.kind==='dm'){
     const id=newMsgId(); const enc=await encryptText(text);
     const body = enc.clear ? { to:activeRoom.title, text:enc.clear, id } : { to:activeRoom.title, e2ee:true, cipher:enc.cipher, iv:enc.iv, id };
@@ -226,46 +267,76 @@ el.fileInput.addEventListener('change', async (e)=>{
   e.target.value='';
 });
 
-// Incoming messages
+// ---------- Incoming messages (append-only) ----------
 socket.on('room_message', async (payload)=>{
   const roomId = payload.roomId;
   const arr = messagesByRoom.get(roomId) || [];
   const text = await decryptText(payload);
-  arr.push({ id: payload.id, from: payload.from, text, ts: payload.ts });
-  messagesByRoom.set(roomId, arr);
-  if (activeRoom && activeRoom.id===roomId) renderMessages();
+  const m = { id: payload.id, from: payload.from, text, ts: payload.ts };
+  arr.push(m); messagesByRoom.set(roomId, arr);
+  if (activeRoom && activeRoom.id===roomId) {
+    appendMessageNode(makeMsgNode(m));
+    // if DM and it's from peer, mark seen (debounced, no spam)
+    if (activeRoom.kind==='dm' && payload.from !== myName) markDmSeen();
+  }
 });
 
-// Receipts
+// ---------- Receipt updates (no full re-render) ----------
 socket.on('delivered', ({id})=>{
-  if (!activeRoom) return;
-  const arr = messagesByRoom.get(activeRoom.id)||[];
-  const m = arr.find(x=>x.id===id); if (m){ m.delivered=true; renderMessages(); }
+  if (!id) return;
+  // Update state for current room if visible
+  if (activeRoom) {
+    const arr = messagesByRoom.get(activeRoom.id)||[];
+    const m = arr.find(x=>x.id===id);
+    if (m && !m.delivered) m.delivered = true;
+  }
+  setTickById(id, '✓');
 });
+
+socket.on('read_dm', ({from,lastId})=>{
+  // Mark our sent DM messages up to lastId as seen across all DM rooms
+  for (const [roomId, arr] of messagesByRoom) {
+    if (!roomId.startsWith('dm:')) continue;
+    for (const m of arr) {
+      if (m.from === myName && (!lastId || m.id <= lastId)) m.seen = true;
+    }
+  }
+  // Update ticks only in the currently open room (if DM)
+  if (activeRoom && activeRoom.id.startsWith('dm:')) {
+    const arr = messagesByRoom.get(activeRoom.id) || [];
+    for (const m of arr) {
+      if (m.from === myName) setTickById(msgKey(m), '✓✓');
+    }
+  }
+});
+
+// ---------- Debounced read receipts (no 2s interval spam) ----------
+const lastSeenSentByRoom = new Map();
+let readDebounce;
 function markDmSeen(){
   if (!activeRoom || activeRoom.kind!=='dm') return;
   const arr = messagesByRoom.get(activeRoom.id)||[];
   const lastFromPeer = [...arr].reverse().find(m=>m.from!==myName);
-  if (lastFromPeer) socket.emit('read_dm', { peer: activeRoom.title, lastId: lastFromPeer.id });
+  if (!lastFromPeer) return;
+  const already = lastSeenSentByRoom.get(activeRoom.id);
+  if (already === lastFromPeer.id) return; // nothing new to report
+  clearTimeout(readDebounce);
+  readDebounce = setTimeout(()=>{
+    socket.emit('read_dm', { peer: activeRoom.title, lastId: lastFromPeer.id });
+    lastSeenSentByRoom.set(activeRoom.id, lastFromPeer.id);
+  }, 250);
 }
 el.messages.addEventListener('scroll', markDmSeen);
 window.addEventListener('focus', markDmSeen);
-setInterval(markDmSeen, 2000);
-socket.on('read_dm', ({from,lastId})=>{
-  for (const [roomId, arr] of messagesByRoom){
-    if (!roomId.startsWith('dm:')) continue;
-    arr.forEach(m=>{ if (m.from===myName) m.seen=true; });
-  }
-  renderMessages();
-});
+// NOTE: removed setInterval(markDmSeen, 2000);
 
-// E2EE button
+// ---------- E2EE button ----------
 el.e2eeBtn.addEventListener('click', enableE2EEForRoom);
 
-// History decoder
+// ---------- History decoder ----------
 async function decodeHistory(hist){
   const out=[]; for (const m of (hist||[])){ const text=await decryptText(m); out.push({ id:m.id, from:m.from, text, ts:m.ts }); } return out;
 }
 
-// Init
+// ---------- Init ----------
 (async function init(){ await promptName(); })();
