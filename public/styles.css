@@ -112,6 +112,7 @@ header {
   box-shadow: var(--shadow);
   position: relative;
   z-index: 10;
+  gap: 12px;
 }
 
 h1 {
@@ -128,6 +129,7 @@ h1 {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-shrink: 0;
 }
 
 #themeBtn {
@@ -140,6 +142,7 @@ h1 {
   font-size: 13px;
   font-weight: 500;
   transition: all 0.2s ease;
+  white-space: nowrap;
 }
 
 #themeBtn:hover {
@@ -154,6 +157,10 @@ h1 {
   background: rgba(77, 163, 255, 0.1);
   border-radius: 20px;
   border: 1px solid rgba(77, 163, 255, 0.2);
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Main Layout */
@@ -724,21 +731,170 @@ input[type="file"] {
   font-weight: 500;
 }
 
-/* Responsive Design */
+/* ===================== */
+/*  Responsive Design    */
+/* ===================== */
+
+/* Large tablets / small laptops */
+@media (max-width: 1024px) {
+  main {
+    grid-template-columns: 260px 1fr;
+  }
+
+  header {
+    padding: 16px 18px;
+  }
+
+  h1 {
+    font-size: 22px;
+  }
+
+  #meBox {
+    max-width: 200px;
+  }
+}
+
+/* Tablets & phones */
 @media (max-width: 768px) {
+  body {
+    font-size: 14px;
+  }
+
+  header {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  h1 {
+    font-size: 20px;
+  }
+
+  .header-actions {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  #meBox {
+    max-width: 100%;
+    width: 100%;
+    text-align: left;
+  }
+
   main {
     grid-template-columns: 1fr;
+    grid-template-rows: auto auto;
+    height: auto;
+    min-height: calc(100vh - 81px);
   }
-  
+
+  /* Keep sidebar usable on mobile: stack above chat */
   aside {
-    display: none;
+    order: 1;
+    border-bottom: 1px solid var(--border);
+    max-height: 260px;
+    padding: 16px;
   }
-  
-  .msg {a
+
+  #chat {
+    order: 2;
+    min-height: 50vh;
+  }
+
+  #roomHeader {
+    padding: 14px 16px;
+  }
+
+  #messages {
+    padding: 14px;
+  }
+
+  .msg {
     max-width: 85%;
+  }
+
+  /* Send form: more vertical spacing on small screens */
+  #sendForm {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 12px 14px;
+  }
+
+  #msgInput {
+    flex: 1 1 100%;
+  }
+
+  #fileInput {
+    flex: 1 1 55%;
+    max-width: none;
+  }
+
+  #sendForm button[type="submit"] {
+    flex: 1 1 40%;
+  }
+
+  .group-actions {
+    flex-direction: column;
+  }
+
+  #newGroupName {
+    width: 100%;
   }
 
   .theme-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Small phones */
+@media (max-width: 480px) {
+  header {
+    padding: 12px 12px 10px;
+  }
+
+  h1 {
+    font-size: 18px;
+  }
+
+  #themeBtn {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+
+  #roomHeader {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  #roomTitle {
+    width: 100%;
+    font-size: 15px;
+  }
+
+  #e2eeBtn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .msg {
+    max-width: 100%;
+    font-size: 13px;
+  }
+
+  #sendForm {
+    flex-direction: column;
+  }
+
+  #msgInput {
+    width: 100%;
+  }
+
+  #fileInput,
+  #sendForm button[type="submit"] {
+    width: 100%;
+  }
+
+  .modal-content {
+    padding: 18px;
   }
 }
