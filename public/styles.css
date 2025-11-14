@@ -898,3 +898,33 @@ input[type="file"] {
     padding: 18px;
   }
 }
+/* === Fix: keep room header visible; scroll only the messages list === */
+main {
+  overflow: hidden; /* prevent page-level scroll inside the grid */
+}
+
+#chat {
+  min-height: 0;    /* allow flex child (#messages) to shrink & be the scroller */
+}
+
+#roomHeader {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: rgba(17, 26, 43, 0.98); /* same tone as your theme */
+}
+
+#roomTitle {
+  flex: 1;
+  min-width: 0;                 /* key for flex ellipsis */
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;      /* long names won’t push buttons off */
+}
+
+#messages {
+  min-height: 0;                /* critical: becomes the scroll container */
+  overflow: auto;
+  overscroll-behavior: contain; /* nice UX: prevent scroll chaining */
+}
+
