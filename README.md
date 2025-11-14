@@ -1,4 +1,4 @@
-# Socket Chat App — SP2 (Improved Group Create)
+...# Socket Chat App — SP2 (Improved Group Create)
 
 This build includes the 4 special features (Typing, DM receipts, File/Image upload, optional E2EE) **and** a more robust group creation flow:
 - Re-prompts for registration if you try to create/join/open a group while not registered.
