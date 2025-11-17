@@ -161,19 +161,29 @@ function setTickById(id, tickText){
 // ---------- Users list ----------
 socket.on('user_list', (users)=>{
   el.userList.innerHTML='';
-  (users||[]).filter(u=>u!==myName).forEach(u=>{
-    const li=document.createElement('li');
-    const btn=document.createElement('button');
-    btn.textContent=u;
-    btn.onclick=async()=>{
-      if (!ensureRegistered()){ await promptName(); if (!ensureRegistered()) return; }
-      const res=await emitAck('open_dm', u);
-      if (res.ok) setRoom(res.roomId, 'dm', res.peer, await decodeHistory(res.history));
-      else alert(res.error||'Cannot open DM');
-    };
-    li.appendChild(btn); el.userList.appendChild(li);
+  (users || []).forEach(u=>{
+    const li = document.createElement('li');
+    const btn = document.createElement('button');
+
+    // แสดงตัวเองด้วย แต่ disable ปุ่มไม่ให้ DM ตัวเอง
+    if (u === myName) {
+      btn.textContent = `${u} (you)`;
+      btn.disabled = true;      // กันเผื่อ TA งงว่าทำไมคลิกแล้วไม่มีอะไร
+    } else {
+      btn.textContent = u;
+      btn.onclick = async () => {
+        if (!ensureRegistered()){ await promptName(); if (!ensureRegistered()) return; }
+        const res = await emitAck('open_dm', u);
+        if (res.ok) setRoom(res.roomId, 'dm', res.peer, await decodeHistory(res.history));
+        else alert(res.error || 'Cannot open DM');
+      };
+    }
+
+    li.appendChild(btn);
+    el.userList.appendChild(li);
   });
 });
+
 
 // ---------- Groups list ----------
 socket.on('groups_list', (groups)=>renderGroupList(groups));
